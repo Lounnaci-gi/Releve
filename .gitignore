@@ -1,0 +1,47 @@
+# Built artifacts
+bin
+gen
+out
+build
+.gradle
+
+# Generated files
+.navigation
+capture.png
+*.apk
+*.ap_
+*.dex
+*.class
+
+# Local configuration
+local.properties
+.DS_Store
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Gradle
+.gradle/
+build/
+
+# Log files
+*.log
+
+# Keystore files
+*.jks
+*.keystore
+*.p12
+
+# External native build
+.externalNativeBuild
+.cxx
+
+# NDK
+obj/
+
+# Captures
+captures/
