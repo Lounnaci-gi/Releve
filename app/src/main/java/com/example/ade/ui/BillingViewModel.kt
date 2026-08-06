@@ -17,6 +17,9 @@ class BillingViewModel(application: Application) : AndroidViewModel(application)
     var previousIndex by mutableStateOf("")
     var currentIndex by mutableStateOf("")
 
+    var showError by mutableStateOf(false)
+    var errorMessage by mutableStateOf("")
+
     private val _calculationResult = MutableStateFlow<CalculationResult?>(null)
     val calculationResult = _calculationResult.asStateFlow()
 
@@ -33,16 +36,36 @@ class BillingViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun calculate() {
-        val prev = previousIndex.toDoubleOrNull() ?: 0.0
-        val curr = currentIndex.toDoubleOrNull() ?: 0.0
-        
+    fun calculate(): Boolean {
+        val prev = previousIndex.toDoubleOrNull()
+        val curr = currentIndex.toDoubleOrNull()
+
+        if (prev == null || curr == null) {
+            errorMessage = "Veuillez saisir des nombres valides"
+            showError = true
+            return false
+        }
+
+        if (curr < prev) {
+            errorMessage = "Le nouvel index doit être supérieur à l'ancien"
+            showError = true
+            return false
+        }
+
+        showError = false
         val result = BillingEngine.calculate(
             usageType = usageType,
             previousIndex = prev,
             currentIndex = curr
         )
         _calculationResult.value = result
+        return true
+    }
+
+    fun clearInputs() {
+        previousIndex = ""
+        currentIndex = ""
+        showError = false
     }
 
     fun saveBill() {
