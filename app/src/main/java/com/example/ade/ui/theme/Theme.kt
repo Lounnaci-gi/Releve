@@ -1,60 +1,63 @@
 package com.example.ade.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = ObatBluePrimaryDark,
-    secondary = ObatOrangeAccent,
-    tertiary = ObatSuccess,
-    background = ObatBackgroundDark,
-    surface = ObatSurfaceDark,
-    onPrimary = Color.Black,
-    onSecondary = Color.Black,
-    onTertiary = Color.Black,
-    onBackground = Color.White,
-    onSurface = ObatOnSurfaceDark
-)
+private fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
-private val LightColorScheme = lightColorScheme(
-    primary = ObatBluePrimary,
-    secondary = ObatOrangeAccent,
-    tertiary = ObatSuccess,
-    background = ObatBackground,
-    surface = ObatSurface,
-    onPrimary = Color.White,
-    onSecondary = Color.Black,
-    onTertiary = Color.White,
-    onBackground = ObatTextPrimary,
-    onSurface = ObatTextPrimary,
-    primaryContainer = ObatBlueLight,
-    onPrimaryContainer = Color.White,
-    secondaryContainer = ObatOrangeAccent,
-    onSecondaryContainer = Color.Black
+private val WaterLightColorScheme = lightColorScheme(
+    primary = WaterPrimary,
+    onPrimary = WaterOnPrimary,
+    primaryContainer = WaterPrimaryContainer,
+    onPrimaryContainer = WaterOnPrimaryContainer,
+    secondary = WaterSecondary,
+    onSecondary = WaterOnSecondary,
+    secondaryContainer = WaterSecondaryContainer,
+    onSecondaryContainer = WaterOnSecondaryContainer,
+    tertiary = WaterTertiary,
+    onTertiary = WaterOnTertiary,
+    tertiaryContainer = WaterTertiaryContainer,
+    onTertiaryContainer = WaterOnTertiaryContainer,
+    error = WaterError,
+    onError = WaterOnError,
+    errorContainer = WaterErrorContainer,
+    onErrorContainer = WaterOnErrorContainer,
+    background = WaterBackground,
+    onBackground = WaterOnBackground,
+    surface = WaterSurface,
+    onSurface = WaterOnSurface,
+    surfaceVariant = WaterSurfaceVariant,
+    onSurfaceVariant = WaterOnSurfaceVariant,
+    outline = WaterOutline
 )
 
 @Composable
-fun ADETheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+fun AdeReleveTheme(
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    
+    val colorScheme = WaterLightColorScheme
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            val activity = view.context.findActivity()
+            activity?.window?.let { window ->
+                window.statusBarColor = colorScheme.primary.toArgb()
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            }
         }
     }
 

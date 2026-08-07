@@ -47,7 +47,7 @@ fun InputScreen(navController: NavController, viewModel: BillingViewModel) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Simulation de Facture",
+                        "Saisie des Index",
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.weight(1f)
@@ -58,13 +58,13 @@ fun InputScreen(navController: NavController, viewModel: BillingViewModel) {
                 }
                 
                 Text(
-                    "Saisissez vos index pour une estimation instantanée facilitée par Obat UI.", 
+                    "Calculez précisément la facture ADE selon les barèmes officiels.", 
                     style = MaterialTheme.typography.bodySmall
                 )
                 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-                Text("Type d'abonnement", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Text("Catégorie d'abonné", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 
                 ExposedDropdownMenuBox(
                     expanded = expanded,
@@ -88,13 +88,34 @@ fun InputScreen(navController: NavController, viewModel: BillingViewModel) {
                     ) {
                         UsageType.entries.forEach { type ->
                             DropdownMenuItem(
-                                text = { Text(type.label) },
+                                text = { 
+                                    Column {
+                                        Text(type.label, fontWeight = FontWeight.Bold)
+                                        Text("Codes ${type.code}", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                },
                                 onClick = {
                                     viewModel.usageType = type
                                     expanded = false
                                 }
                             )
                         }
+                    }
+                }
+
+                if (viewModel.usageType == UsageType.CAT_V) {
+                    Text("Taux de TVA (Vente en Gros)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = viewModel.wholesaleTvaRate == 0.09,
+                            onClick = { viewModel.wholesaleTvaRate = 0.09 }
+                        )
+                        Text("9%", modifier = Modifier.padding(end = 16.dp))
+                        RadioButton(
+                            selected = viewModel.wholesaleTvaRate == 0.19,
+                            onClick = { viewModel.wholesaleTvaRate = 0.19 }
+                        )
+                        Text("19%")
                     }
                 }
 
@@ -115,19 +136,19 @@ fun InputScreen(navController: NavController, viewModel: BillingViewModel) {
                         value = viewModel.previousIndex,
                         onValueChange = { viewModel.previousIndex = it },
                         label = { Text("Ancien Index") },
-                        isError = viewModel.showError && viewModel.previousIndex.isEmpty(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
                     )
                     OutlinedTextField(
                         value = viewModel.currentIndex,
                         onValueChange = { viewModel.currentIndex = it },
                         label = { Text("Nouveau Index") },
-                        isError = viewModel.showError && (viewModel.currentIndex.isEmpty() || (viewModel.currentIndex.toDoubleOrNull() ?: 0.0) < (viewModel.previousIndex.toDoubleOrNull() ?: 0.0)),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
                     )
                 }
             }
@@ -142,18 +163,11 @@ fun InputScreen(navController: NavController, viewModel: BillingViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            shape = MaterialTheme.shapes.medium,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary
-            ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+            shape = MaterialTheme.shapes.medium
         ) {
             Icon(Icons.Default.Refresh, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("Lancer le calcul", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Calculer la facture", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         }
     }
 }
-
-

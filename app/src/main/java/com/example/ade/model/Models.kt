@@ -4,9 +4,11 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 enum class UsageType(val label: String, val code: String) {
-    DOMESTIC("Ménage / Domestique", "10"),
-    COMMERCIAL("Commerce / Admin / Service", "30"),
-    PROFESSIONAL("Professionnel / Industriel", "40")
+    CAT_I("Catégorie I - Ménages", "11-19"),
+    CAT_II("Catégorie II - Administration", "20-29"),
+    CAT_III("Catégorie III - Commercial", "30-39"),
+    CAT_IV("Catégorie IV - Industriel", "40-49"),
+    CAT_V("Catégorie V - Vente en Gros", "15")
 }
 
 @Entity(tableName = "billing_history")
@@ -17,33 +19,25 @@ data class BillRecord(
     val previousIndex: Double,
     val currentIndex: Double,
     val consumption: Double,
-    
-    // Results
-    val waterAmount: Double,
-    val sanitationAmount: Double,
-    val fixedFees: Double,
-    val regulationFees: Double,
-    val tvaAmount: Double,
-    val totalTTC: Double
+    val fixedAmount: Double,
+    val variableAmount: Double,
+    val totalTTC: Double,
+    val wholesaleTvaRate: Double = 0.0
 )
 
 data class CalculationResult(
     val consumption: Double,
-    val waterAmount: Double,
-    val sanitationAmount: Double,
-    val waterTva: Double,
-    val sanitationTva: Double,
-    val fixedFees: Double,
-    val regulationFees: Double,
+    val fixedAmount: Double,
+    val variableAmount: Double,
     val totalTTC: Double,
-    val tranches: List<TrancheDetail> = emptyList()
+    val tiers: List<TierDetail> = emptyList(),
+    val tvaAmount: Double = 0.0,
+    val isWholesale: Boolean = false
 )
 
-data class TrancheDetail(
-    val range: String,
+data class TierDetail(
+    val label: String,
     val volume: Double,
-    val waterRate: Double,
-    val sanitationRate: Double,
-    val waterAmount: Double,
-    val sanitationAmount: Double
+    val rate: Double,
+    val amount: Double
 )

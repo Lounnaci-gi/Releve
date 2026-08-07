@@ -25,7 +25,7 @@ class Converters {
     fun toUsageType(value: String) = UsageType.valueOf(value)
 }
 
-@Database(entities = [BillRecord::class], version = 1)
+@Database(entities = [BillRecord::class], version = 3) // Incrémenté à 3 pour forcer la remise à zéro
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun billDao(): BillDao
@@ -40,7 +40,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "ade_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
