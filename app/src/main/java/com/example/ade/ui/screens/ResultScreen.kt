@@ -1,18 +1,23 @@
 package com.example.ade.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.ade.model.CalculationResult
+import com.example.ade.model.InvoiceLine
 import com.example.ade.ui.BillingViewModel
+import java.math.BigDecimal
 import java.util.*
 
 @Composable
@@ -27,108 +32,119 @@ fun ResultScreen(navController: NavController, viewModel: BillingViewModel) {
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // En-tête Total
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("MONTANT TOTAL TTC", style = MaterialTheme.typography.labelLarge)
+                Text("MONTANT DE LA FACTURE", color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
                 Text(
-                    String.format(Locale.US, "%.2f DA", result.totalTTC),
+                    "${result.montantFacture} DA",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f)
-                ) {
-                    Text(
-                        "Consommation : ${String.format(Locale.US, "%.2f", result.consumption)} m³",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    "Consommation totale : ${result.consumption} m³",
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
         }
 
-        Text("Détail du calcul", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        // Bloc 1 : EAU
+        InvoiceBlock(title = "BLOC EAU (1)", lines = result.waterLines, fixedFee = result.fixedFeeWater, subTotal = result.subTotalWater)
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Tiers breakdown
-                result.tiers.forEach { tier ->
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(tier.label, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                "${String.format(Locale.US, "%.2f", tier.volume)} m³ × ${String.format(Locale.US, "%.4f", tier.rate)} DA",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        Text(
-                            String.format(Locale.US, "%.2f DA", tier.amount),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.align(Alignment.CenterVertically)
-                        )
-                    }
-                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                }
-
-                // Fixed Amount
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(if (result.isWholesale) "Partie Fixe (HT)" else "Partie Fixe (Abonnement)", modifier = Modifier.weight(1f))
-                    Text(String.format(Locale.US, "%.2f DA", result.fixedAmount), fontWeight = FontWeight.Bold)
-                }
-
-                if (result.isWholesale) {
-                    HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text("TVA", modifier = Modifier.weight(1f))
-                        Text(String.format(Locale.US, "%.2f DA", result.tvaAmount), fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+        // Bloc 2 : ASSAINISSEMENT
+        if (!result.isWholesale) {
+            InvoiceBlock(title = "BLOC ASSAINISSEMENT (2)", lines = result.sanitationLines, fixedFee = result.fixedFeeSanitation, subTotal = result.subTotalSanitation)
         }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(if (result.isWholesale) "Total Variable HT" else "Total Variable TTC", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                    Text(String.format(Locale.US, "%.2f DA", result.variableAmount), style = MaterialTheme.typography.bodySmall)
-                }
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(if (result.isWholesale) "Total Fixe HT" else "Total Fixe TTC", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                    Text(String.format(Locale.US, "%.2f DA", result.fixedAmount), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        }
+        // Bloc 3 : TAXES ET REDEVANCES
+        TaxesBlock(result)
 
         Button(
             onClick = { navController.popBackStack() },
             modifier = Modifier.fillMaxWidth().height(56.dp)
         ) {
-            Text("Nouveau calcul")
+            Text("NOUVEAU CALCUL")
         }
-        
-        Spacer(Modifier.height(16.dp))
-        
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.outline)
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "Calcul précis selon barèmes ADE et loi de finances.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
-            )
+    }
+}
+
+@Composable
+fun InvoiceBlock(title: String, lines: List<InvoiceLine>, fixedFee: BigDecimal, subTotal: BigDecimal) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            
+            HeaderRow("Libellé", "Qte", "P.U", "Montant")
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            
+            // Fixed Fee
+            DataRow("Redevance fixe", "-", "-", fixedFee.toString())
+            
+            // Tiers
+            lines.forEach { line ->
+                DataRow(line.label, line.quantity.toString(), line.priceUnit.toString(), line.amount.toString())
+            }
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 2.dp)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("SOUS-TOTAL", fontWeight = FontWeight.Bold)
+                Text("${subTotal} DA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
         }
+    }
+}
+
+@Composable
+fun TaxesBlock(result: CalculationResult) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("TAXES ET REDEVANCES (3)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            
+            HeaderRow("Libellé", "Assiette", "Taux", "Montant")
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            
+            DataRow("TVA", (result.subTotalWater.add(result.subTotalSanitation)).toString(), "9.00 %", result.tvaTotal.toString())
+            if (!result.isWholesale) {
+                DataRow("Redevance gestion", result.consumption.toString(), "3.00 DA", result.redevanceGestion.toString())
+                DataRow("Redevance qualité", result.waterUsageHT.toString(), "4.00 %", result.redevanceQualiteEau.toString())
+                DataRow("Redevance économie", result.waterUsageHT.toString(), "4.00 %", result.redevanceEconomieEau.toString())
+            }
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 2.dp)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("SOUS-TOTAL TAXES", fontWeight = FontWeight.Bold)
+                Text("${result.subTotalTaxes} DA", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
+            }
+        }
+    }
+}
+
+@Composable
+fun HeaderRow(c1: String, c2: String, c3: String, c4: String) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(c1, modifier = Modifier.weight(2f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        Text(c2, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+        Text(c3, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+        Text(c4, modifier = Modifier.weight(1.5f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
+    }
+}
+
+@Composable
+fun DataRow(label: String, qte: String, pu: String, amount: String) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(2f), style = MaterialTheme.typography.bodySmall)
+        Text(qte, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End)
+        Text(pu, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.End)
+        Text(amount, modifier = Modifier.weight(1.5f), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
     }
 }

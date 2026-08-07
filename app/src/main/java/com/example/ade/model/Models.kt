@@ -2,6 +2,7 @@ package com.example.ade.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.math.BigDecimal
 
 enum class UsageType(val label: String, val code: String) {
     CAT_I("Catégorie I - Ménages", "11-19"),
@@ -19,25 +20,40 @@ data class BillRecord(
     val previousIndex: Double,
     val currentIndex: Double,
     val consumption: Double,
-    val fixedAmount: Double,
-    val variableAmount: Double,
-    val totalTTC: Double,
-    val wholesaleTvaRate: Double = 0.0
+    val totalTTC: Double
 )
 
 data class CalculationResult(
-    val consumption: Double,
-    val fixedAmount: Double,
-    val variableAmount: Double,
-    val totalTTC: Double,
-    val tiers: List<TierDetail> = emptyList(),
-    val tvaAmount: Double = 0.0,
+    val consumption: BigDecimal,
+    
+    // Bloc EAU
+    val waterLines: List<InvoiceLine>,
+    val waterUsageHT: BigDecimal,
+    val fixedFeeWater: BigDecimal,
+    val subTotalWater: BigDecimal, // (1)
+    
+    // Bloc ASSAINISSEMENT
+    val sanitationLines: List<InvoiceLine>,
+    val sanitationUsageHT: BigDecimal,
+    val fixedFeeSanitation: BigDecimal,
+    val subTotalSanitation: BigDecimal, // (2)
+    
+    // Bloc TAXES ET REDEVANCES
+    val tvaEau: BigDecimal,
+    val tvaSanitation: BigDecimal,
+    val tvaTotal: BigDecimal,
+    val redevanceGestion: BigDecimal,
+    val redevanceQualiteEau: BigDecimal,
+    val redevanceEconomieEau: BigDecimal,
+    val subTotalTaxes: BigDecimal, // (3)
+    
+    val montantFacture: BigDecimal,
     val isWholesale: Boolean = false
 )
 
-data class TierDetail(
+data class InvoiceLine(
     val label: String,
-    val volume: Double,
-    val rate: Double,
-    val amount: Double
+    val priceUnit: BigDecimal,
+    val quantity: BigDecimal,
+    val amount: BigDecimal
 )

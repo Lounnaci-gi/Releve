@@ -65,11 +65,8 @@ class BillingViewModel(application: Application) : AndroidViewModel(application)
                     usageType = usageType,
                     previousIndex = prev,
                     currentIndex = curr,
-                    consumption = result.consumption,
-                    fixedAmount = result.fixedAmount,
-                    variableAmount = result.variableAmount,
-                    totalTTC = result.totalTTC,
-                    wholesaleTvaRate = if (usageType == UsageType.CAT_V) wholesaleTvaRate else 0.0
+                    consumption = result.consumption.toDouble(),
+                    totalTTC = result.montantFacture.toDouble()
                 )
             )
             loadHistory()
