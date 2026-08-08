@@ -1,15 +1,22 @@
 package com.example.ade.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -80,6 +87,17 @@ fun ResultScreen(navController: NavController, viewModel: BillingViewModel) {
 @Composable
 fun DetailedResult(result: CalculationResult) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Graphique de consommation
+        if (result.waterLines.isNotEmpty()) {
+            Text("Répartition de la consommation", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Card(
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                ConsumptionChart(result.waterLines)
+            }
+        }
+
         // Bloc EAU (Bleu clair)
         InvoiceBlock(
             title = "BLOC EAU (1)",
@@ -102,6 +120,79 @@ fun DetailedResult(result: CalculationResult) {
 
         // Bloc TAXES ET REDEVANCES
         TaxesBlock(result)
+    }
+}
+
+@Composable
+fun ConsumptionChart(lines: List<InvoiceLine>) {
+    var selectedIndex by remember { mutableIntStateOf(-1) }
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    
+    val scales = lines.indices.map { index ->
+        animateFloatAsState(
+            targetValue = if (selectedIndex == -1 || selectedIndex == index) 1f else 0.4f,
+            label = "barScale_$index"
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(lines) {
+                    detectTapGestures { offset ->
+                        val width = size.width
+                        val barWidth = width / (lines.size * 2 - 1)
+                        val index = (offset.x / (barWidth * 2)).toInt()
+                        if (index in lines.indices) {
+                            selectedIndex = if (selectedIndex == index) -1 else index
+                        } else {
+                            selectedIndex = -1
+                        }
+                    }
+                }
+        ) {
+            val width = size.width
+            val height = size.height - 30.dp.toPx() 
+            val barWidth = width / (lines.size * 2 - 1)
+            val maxQuantity = lines.maxOfOrNull { it.quantity.toDouble() } ?: 1.0
+            
+            lines.forEachIndexed { index, line ->
+                val quantity = line.quantity.toDouble()
+                val barHeight = (quantity / maxQuantity) * height * scales[index].value
+                val x = index * barWidth * 2
+                val y = size.height - barHeight.toFloat()
+                
+                drawRoundRect(
+                    color = if (index % 2 == 0) primaryColor else secondaryColor,
+                    topLeft = Offset(x, y),
+                    size = Size(barWidth, barHeight.toFloat()),
+                    cornerRadius = CornerRadius(6.dp.toPx()),
+                    alpha = if (selectedIndex == -1 || selectedIndex == index) 1f else 0.3f
+                )
+
+                if (selectedIndex == index || (selectedIndex == -1 && lines.size <= 4)) {
+                    drawContext.canvas.nativeCanvas.apply {
+                        val text = String.format(Locale.US, "%.1f", quantity)
+                        val paint = android.graphics.Paint().apply {
+                            color = onSurface.toArgb()
+                            textSize = 10.sp.toPx()
+                            textAlign = android.graphics.Paint.Align.CENTER
+                            isFakeBoldText = true
+                        }
+                        drawText(text, x + barWidth / 2, y - 8.dp.toPx(), paint)
+                    }
+                }
+            }
+            drawLine(
+                color = Color.LightGray.copy(alpha = 0.5f),
+                start = Offset(0f, size.height),
+                end = Offset(width, size.height),
+                strokeWidth = 2f
+            )
+        }
     }
 }
 
@@ -153,10 +244,8 @@ fun InvoiceBlock(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = contentColor.copy(alpha = 0.2f))
             
-            // Redevance Fixe
             DataRow("Redevance fixe", "—", "—", fixedFee.toString())
             
-            // Tranches
             lines.forEach { line ->
                 DataRow(line.label, line.quantity.toString(), line.priceUnit.toString(), line.amount.toString())
             }

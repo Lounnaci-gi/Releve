@@ -24,6 +24,8 @@ import com.example.ade.ui.screens.*
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Input : Screen("input", "Saisie", Icons.Default.Edit)
     object History : Screen("history", "Historique", Icons.Default.List)
+    object About : Screen("about", "À propos", Icons.Default.Info)
+    object Tariffs : Screen("tariffs", "Tarifs", Icons.Default.Settings)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,27 +52,37 @@ fun BillingApp() {
                                 "input" -> "Simulation ADE"
                                 "history" -> "Historique"
                                 "result" -> "Détail Facture"
+                                "about" -> "À propos"
+                                "tariffs" -> "Barème Officiel"
                                 else -> "ADE Relevé"
                             }
                         )
                     }
                 },
                 navigationIcon = {
-                    if (currentRoute == "result") {
+                    if (currentRoute == "result" || currentRoute == "about" || currentRoute == "tariffs") {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                        }
+                    }
+                },
+                actions = {
+                    if (currentRoute != "about") {
+                        IconButton(onClick = { navController.navigate(Screen.About.route) }) {
+                            Icon(Icons.Default.Info, contentDescription = "À propos")
                         }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         },
         bottomBar = {
-            if (currentRoute != "result") {
+            if (currentRoute == "input" || currentRoute == "history") {
                 NavigationBar {
                     val currentDestination = navBackStackEntry?.destination
                     val items = listOf(Screen.Input, Screen.History)
@@ -107,6 +119,8 @@ fun BillingApp() {
             composable(Screen.Input.route) { InputScreen(navController, viewModel) }
             composable(Screen.History.route) { HistoryScreen(viewModel) }
             composable("result") { ResultScreen(navController, viewModel) }
+            composable(Screen.About.route) { AboutScreen(navController) }
+            composable(Screen.Tariffs.route) { TariffScreen(navController) }
         }
     }
 }
