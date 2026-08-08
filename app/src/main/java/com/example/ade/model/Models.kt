@@ -5,11 +5,11 @@ import androidx.room.PrimaryKey
 import java.math.BigDecimal
 
 enum class UsageType(val label: String, val code: String) {
-    CAT_I("Catégorie I - Ménages", "11-19"),
-    CAT_II("Catégorie II - Administration", "20-29"),
-    CAT_III("Catégorie III - Commercial", "30-39"),
-    CAT_IV("Catégorie IV - Industriel", "40-49"),
-    CAT_V("Catégorie V - Vente en Gros", "15")
+    CAT_I("Catégorie I – Ménages", "11-19 (sauf 15)"),
+    CAT_II("Catégorie II – Administration", "20-29"),
+    CAT_III("Catégorie III – Commercial", "30-39"),
+    CAT_IV("Catégorie IV – Industriel", "40-49"),
+    CAT_V("Catégorie V – Vente en Gros", "15")
 }
 
 @Entity(tableName = "billing_history")
@@ -25,29 +25,33 @@ data class BillRecord(
 
 data class CalculationResult(
     val consumption: BigDecimal,
+    val usageType: UsageType,
     
     // Bloc EAU
     val waterLines: List<InvoiceLine>,
     val waterUsageHT: BigDecimal,
     val fixedFeeWater: BigDecimal,
-    val subTotalWater: BigDecimal, // (1)
+    val subTotalWater: BigDecimal,
     
     // Bloc ASSAINISSEMENT
     val sanitationLines: List<InvoiceLine>,
     val sanitationUsageHT: BigDecimal,
     val fixedFeeSanitation: BigDecimal,
-    val subTotalSanitation: BigDecimal, // (2)
+    val subTotalSanitation: BigDecimal,
     
     // Bloc TAXES ET REDEVANCES
-    val tvaEau: BigDecimal,
-    val tvaSanitation: BigDecimal,
+    val tvaEau: BigDecimal = BigDecimal.ZERO,
+    val tvaSanitation: BigDecimal = BigDecimal.ZERO,
     val tvaTotal: BigDecimal,
-    val redevanceGestion: BigDecimal,
-    val redevanceQualiteEau: BigDecimal,
-    val redevanceEconomieEau: BigDecimal,
-    val subTotalTaxes: BigDecimal, // (3)
+    val redevanceGestion: BigDecimal = BigDecimal.ZERO,
+    val redevanceQualiteEau: BigDecimal = BigDecimal.ZERO,
+    val redevanceEconomieEau: BigDecimal = BigDecimal.ZERO,
+    val subTotalTaxes: BigDecimal,
     
     val montantFacture: BigDecimal,
+    
+    // Flags UI
+    val isSimplified: Boolean = false,
     val isWholesale: Boolean = false
 )
 

@@ -10,125 +10,144 @@ object BillingEngine {
         usageType: UsageType,
         previousIndex: Double,
         currentIndex: Double,
-        wholesaleTvaRate: Double = 0.19
+        wholesaleTvaRate: Double = 19.0
     ): CalculationResult {
         val consumptionDouble = (currentIndex - previousIndex).coerceAtLeast(0.0)
         val consumption = BigDecimal.valueOf(consumptionDouble).setScale(2, RoundingMode.HALF_UP)
 
         return when (usageType) {
             UsageType.CAT_I -> calculateCategoryI(consumption)
-            else -> calculateWholesale(consumption, BigDecimal.valueOf(wholesaleTvaRate))
+            UsageType.CAT_II, UsageType.CAT_III -> calculateSimplified(usageType, consumption, TariffConfig.CategoryII_III.FIXED_PART, TariffConfig.CategoryII_III.VARIABLE_RATE)
+            UsageType.CAT_IV -> calculateSimplified(usageType, consumption, TariffConfig.CategoryIV.FIXED_PART, TariffConfig.CategoryIV.VARIABLE_RATE)
+            UsageType.CAT_V -> calculateWholesale(consumption, BigDecimal.valueOf(wholesaleTvaRate))
         }
     }
 
     private fun calculateCategoryI(totalQte: BigDecimal): CalculationResult {
         val config = TariffConfig.CategoryI
-        val waterLines = mutableListOf<InvoiceLine>()
-        val sanitationLines = mutableListOf<InvoiceLine>()
         
-        var remaining = totalQte
-        
-        val tiers = listOf(
-            TierConfig("Tranche 1 (0-25 m³)", config.TIER_1_LIMIT, config.WATER_P1, config.SANITATION_P1),
-            TierConfig("Tranche 2 (26-55 m³)", config.TIER_2_LIMIT, config.WATER_P2, config.SANITATION_P2),
-            TierConfig("Tranche 3 (56-82 m³)", config.TIER_3_LIMIT, config.WATER_P3, config.SANITATION_P3),
-            TierConfig("Tranche 4 (> 82 m³)", BigDecimal("1000000"), config.WATER_P4, config.SANITATION_P4)
+        // Répartition en tranches
+        val tranches = listOf(
+            TrancheSpec("Tranche 1 (0-25 m³)", config.T1_CAPACITY, config.WATER_P1, config.SANITATION_P1),
+            TrancheSpec("Tranche 2 (26-55 m³)", config.T2_CAPACITY, config.WATER_P2, config.SANITATION_P2),
+            TrancheSpec("Tranche 3 (56-82 m³)", config.T3_CAPACITY, config.WATER_P3, config.SANITATION_P3),
+            TrancheSpec("Tranche 4 (> 82 m³)", config.T4_CAPACITY, config.WATER_P4, config.SANITATION_P4)
         )
 
-        for (tier in tiers) {
-            if (remaining <= BigDecimal.ZERO && totalQte > BigDecimal.ZERO) break
+        val waterLines = mutableListOf<InvoiceLine>()
+        val sanitationLines = mutableListOf<InvoiceLine>()
+        var reste = totalQte
+
+        for (spec in tranches) {
+            if (reste <= BigDecimal.ZERO && totalQte > BigDecimal.ZERO) break
             
-            val qte = if (tier.limit == BigDecimal("1000000")) remaining else remaining.min(tier.limit)
-            if (qte > BigDecimal.ZERO || (totalQte == BigDecimal.ZERO && tier == tiers[0])) {
-                val effectiveQte = qte.coerceAtLeast(BigDecimal.ZERO)
+            val qte = if (spec.capacity == BigDecimal("1000000")) reste else reste.min(spec.capacity)
+            if (qte > BigDecimal.ZERO || (totalQte == BigDecimal.ZERO && spec == tranches[0])) {
+                val amtWater = qte.multiply(spec.priceEau).setScale(2, RoundingMode.HALF_UP)
+                val amtAss = qte.multiply(spec.priceAss).setScale(2, RoundingMode.HALF_UP)
                 
-                // Étape 1: Arrondi par ligne
-                val waterAmount = effectiveQte.multiply(tier.waterPrice).setScale(2, RoundingMode.HALF_UP)
-                val sanitationAmount = effectiveQte.multiply(tier.sanitationPrice).setScale(2, RoundingMode.HALF_UP)
+                waterLines.add(InvoiceLine(spec.label, spec.priceEau, qte, amtWater))
+                sanitationLines.add(InvoiceLine(spec.label, spec.priceAss, qte, amtAss))
                 
-                waterLines.add(InvoiceLine(tier.label, tier.waterPrice, effectiveQte, waterAmount))
-                sanitationLines.add(InvoiceLine(tier.label, tier.sanitationPrice, effectiveQte, sanitationAmount))
-                
-                remaining = remaining.subtract(effectiveQte)
+                reste = reste.subtract(qte)
             }
         }
 
-        // Étape 1 Bis: Somme des lignes déjà arrondies
-        val waterUsageHT = waterLines.fold(BigDecimal.ZERO) { acc, line -> acc.add(line.amount) }
-        val sanitationUsageHT = sanitationLines.fold(BigDecimal.ZERO) { acc, line -> acc.add(line.amount) }
+        // Étape 1 : Somme des lignes arrondies
+        val eauUsageHT = waterLines.fold(BigDecimal.ZERO) { acc, line -> acc.add(line.amount) }
+        val assUsageHT = sanitationLines.fold(BigDecimal.ZERO) { acc, line -> acc.add(line.amount) }
 
-        // Étape 2: Sous-totaux avec redevances fixes
-        val subTotalWater = waterUsageHT.add(config.FIXED_FEE_WATER).setScale(2, RoundingMode.HALF_UP)
-        val subTotalSanitation = sanitationUsageHT.add(config.FIXED_FEE_SANITATION).setScale(2, RoundingMode.HALF_UP)
+        // Étape 2 : Sous-totaux avec RFA
+        val subTotalEau = eauUsageHT.add(config.RFA_WATER).setScale(2, RoundingMode.HALF_UP)
+        val subTotalAss = assUsageHT.add(config.RFA_SANITATION).setScale(2, RoundingMode.HALF_UP)
 
-        // Étape 3: TVA calculée SÉPARÉMENT
-        val tvaEau = subTotalWater.multiply(config.RATE_TVA).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
-        val tvaSanitation = subTotalSanitation.multiply(config.RATE_TVA).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
-        val tvaTotal = tvaEau.add(tvaSanitation)
+        // Étape 3 : TVA séparée
+        val tvaEau = subTotalEau.multiply(config.TAX_TVA_RATE).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+        val tvaAss = subTotalAss.multiply(config.TAX_TVA_RATE).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+        val tvaTotal = tvaEau.add(tvaAss)
 
-        // Étape 4: Redevances additionnelles
-        val redevanceGestion = totalQte.multiply(config.RATE_REDEVANCE_GESTION).setScale(2, RoundingMode.HALF_UP)
-        val redevanceQualiteEau = waterUsageHT.multiply(config.RATE_RQE).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
-        val redevanceEconomieEau = waterUsageHT.multiply(config.RATE_REE).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+        // Étape 4 : Redevances
+        val redevanceGestion = totalQte.multiply(config.TAX_GESTION_RATE).setScale(2, RoundingMode.HALF_UP)
+        val redevanceQualite = eauUsageHT.multiply(config.TAX_RQE_RATE).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+        val redevanceEconomie = eauUsageHT.multiply(config.TAX_REE_RATE).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
 
-        // Étape 5: Totaux finaux
-        val subTotalTaxes = tvaTotal.add(redevanceGestion).add(redevanceQualiteEau).add(redevanceEconomieEau)
-        val montantFacture = subTotalWater.add(subTotalSanitation).add(subTotalTaxes)
+        // Étape 5 : Totaux finaux
+        val subTotalTaxes = tvaTotal.add(redevanceGestion).add(redevanceQualite).add(redevanceEconomie)
+        val montantFacture = subTotalEau.add(subTotalAss).add(subTotalTaxes)
 
         return CalculationResult(
             consumption = totalQte,
+            usageType = UsageType.CAT_I,
             waterLines = waterLines,
-            waterUsageHT = waterUsageHT,
-            fixedFeeWater = config.FIXED_FEE_WATER,
-            subTotalWater = subTotalWater,
+            waterUsageHT = eauUsageHT,
+            fixedFeeWater = config.RFA_WATER,
+            subTotalWater = subTotalEau,
             sanitationLines = sanitationLines,
-            sanitationUsageHT = sanitationUsageHT,
-            fixedFeeSanitation = config.FIXED_FEE_SANITATION,
-            subTotalSanitation = subTotalSanitation,
+            sanitationUsageHT = assUsageHT,
+            fixedFeeSanitation = config.RFA_SANITATION,
+            subTotalSanitation = subTotalAss,
             tvaEau = tvaEau,
-            tvaSanitation = tvaSanitation,
+            tvaSanitation = tvaAss,
             tvaTotal = tvaTotal,
             redevanceGestion = redevanceGestion,
-            redevanceQualiteEau = redevanceQualiteEau,
-            redevanceEconomieEau = redevanceEconomieEau,
+            redevanceQualiteEau = redevanceQualite,
+            redevanceEconomieEau = redevanceEconomie,
             subTotalTaxes = subTotalTaxes,
             montantFacture = montantFacture
         )
     }
 
-    private fun calculateWholesale(totalQte: BigDecimal, tvaRate: BigDecimal): CalculationResult {
-        val config = TariffConfig.Wholesale
-        val variableHT = totalQte.multiply(config.VARIABLE_RATE_HT).setScale(2, RoundingMode.HALF_UP)
-        val totalHT = config.FIXED_FEE_HT.add(variableHT)
-        val tvaTotal = totalHT.multiply(tvaRate).setScale(2, RoundingMode.HALF_UP)
-        val montantFacture = totalHT.add(tvaTotal)
+    private fun calculateSimplified(type: UsageType, qte: BigDecimal, fixed: BigDecimal, rate: BigDecimal): CalculationResult {
+        val variablePart = qte.multiply(rate).setScale(2, RoundingMode.HALF_UP)
+        val total = fixed.add(variablePart).setScale(2, RoundingMode.HALF_UP)
 
         return CalculationResult(
-            consumption = totalQte,
-            waterLines = listOf(InvoiceLine("Vente en Gros", config.VARIABLE_RATE_HT, totalQte, variableHT)),
+            consumption = qte,
+            usageType = type,
+            waterLines = emptyList(),
+            waterUsageHT = variablePart,
+            fixedFeeWater = fixed,
+            subTotalWater = total,
+            sanitationLines = emptyList(),
+            sanitationUsageHT = BigDecimal.ZERO,
+            fixedFeeSanitation = BigDecimal.ZERO,
+            subTotalSanitation = BigDecimal.ZERO,
+            tvaTotal = BigDecimal.ZERO, // Inclus dans le tarif tout compris pour ces catégories
+            subTotalTaxes = BigDecimal.ZERO,
+            montantFacture = total,
+            isSimplified = true
+        )
+    }
+
+    private fun calculateWholesale(qte: BigDecimal, tvaRate: BigDecimal): CalculationResult {
+        val config = TariffConfig.CategoryV
+        val variableHT = qte.multiply(config.PRICE_UNIT_WATER_HT).setScale(2, RoundingMode.HALF_UP)
+        val totalHT = config.RFA.add(variableHT)
+        val tva = totalHT.multiply(tvaRate).divide(BigDecimal("100"), 2, RoundingMode.HALF_UP)
+        val totalTTC = totalHT.add(tva)
+
+        return CalculationResult(
+            consumption = qte,
+            usageType = UsageType.CAT_V,
+            waterLines = emptyList(),
             waterUsageHT = variableHT,
-            fixedFeeWater = config.FIXED_FEE_HT,
+            fixedFeeWater = config.RFA,
             subTotalWater = totalHT,
             sanitationLines = emptyList(),
             sanitationUsageHT = BigDecimal.ZERO,
             fixedFeeSanitation = BigDecimal.ZERO,
             subTotalSanitation = BigDecimal.ZERO,
-            tvaEau = tvaTotal,
-            tvaSanitation = BigDecimal.ZERO,
-            tvaTotal = tvaTotal,
-            redevanceGestion = BigDecimal.ZERO,
-            redevanceQualiteEau = BigDecimal.ZERO,
-            redevanceEconomieEau = BigDecimal.ZERO,
-            subTotalTaxes = tvaTotal,
-            montantFacture = montantFacture,
+            tvaTotal = tva,
+            subTotalTaxes = tva,
+            montantFacture = totalTTC,
             isWholesale = true
         )
     }
 
-    private data class TierConfig(
+    private data class TrancheSpec(
         val label: String,
-        val limit: BigDecimal,
-        val waterPrice: BigDecimal,
-        val sanitationPrice: BigDecimal
+        val capacity: BigDecimal,
+        val priceEau: BigDecimal,
+        val priceAss: BigDecimal
     )
 }

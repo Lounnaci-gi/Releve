@@ -43,13 +43,13 @@ class BillingViewModel(application: Application) : AndroidViewModel(application)
         val curr = currentIndex.toDoubleOrNull()
 
         if (prev == null || curr == null) {
-            errorMessage = "Veuillez saisir des index valides."
+            errorMessage = "Veuillez saisir des index numériques valides."
             showError = true
             return false
         }
 
         if (curr < prev) {
-            errorMessage = "Le nouvel index doit être supérieur ou égal à l'ancien."
+            errorMessage = "Le nouvel index doit être supérieur ou égal à l'ancien index."
             showError = true
             return false
         }

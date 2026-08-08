@@ -107,13 +107,13 @@ fun InputScreen(navController: NavController, viewModel: BillingViewModel) {
                     Text("Taux de TVA (Vente en Gros)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(
-                            selected = viewModel.wholesaleTvaRate == 0.09,
-                            onClick = { viewModel.wholesaleTvaRate = 0.09 }
+                            selected = viewModel.wholesaleTvaRate == 9.0,
+                            onClick = { viewModel.wholesaleTvaRate = 9.0 }
                         )
                         Text("9%", modifier = Modifier.padding(end = 16.dp))
                         RadioButton(
-                            selected = viewModel.wholesaleTvaRate == 0.19,
-                            onClick = { viewModel.wholesaleTvaRate = 0.19 }
+                            selected = viewModel.wholesaleTvaRate == 19.0,
+                            onClick = { viewModel.wholesaleTvaRate = 19.0 }
                         )
                         Text("19%")
                     }
